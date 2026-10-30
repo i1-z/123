@@ -1,9 +1,7 @@
 import { connect as 建立连接 } from 'cloudflare:sockets';
 
-// 核心配置与内置死代码
 const 配置中心 = {
     固定UUID: '3dfc81a7-8cba-4a83-b590-559860dd2a44',
-    KV变量名: 'KV',
     协议名: atob('dmxlc3M='),
     转换器: atob('U3ViQXBpLkNtbGlVc3NzUy5OZXQ='),
     规则配置: atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FDTDRTU1IvQUNMNFNTUi9tYXN0ZXIvQ2xhc2gvY29uZmlnL0FDTDRTU1JfT25saW5lX01pbmlfTXVsdGlNb2RlLmluaQ=='),
@@ -36,8 +34,6 @@ export default {
 async function 初始化上下文(请求, 环境) {
     const 网址 = new URL(请求.url);
     const 客户端信息 = 请求.headers.get('User-Agent') || 'null';
-    
-    // 直接使用写死的 UUID 作为主标识
     let 主标识 = 配置中心.固定UUID;
     let 备用标识 = '';
 
@@ -124,11 +120,6 @@ async function 处理网页请求(请求, 环境, 上下文) {
         });
     }
 
-    // 绑定绑定的 KV 空间变量名 "try"
-    if (路径名 === `/${主标识}/edit` || 路径小写 === `/${主标识}/edit`) {
-        return await 处理存储编辑(请求, 环境);
-    }
-
     if (路径小写 === `/${伪装标识}`) {
         const 伪装内容 = await 构建订阅内容(环境, 上下文, true);
         return new Response(伪装内容, { status: 200 });
@@ -167,33 +158,14 @@ async function 处理网页请求(请求, 环境, 上下文) {
 }
 
 async function 构建订阅内容(环境, 上下文, 是否伪装请求) {
-    let 节点池 = 环境.ADD ? 拆分列表(环境.ADD) : [];
-    let 接口池 = 环境.ADDAPI ? 拆分列表(环境.ADDAPI) : [];
-    let 明文池 = 环境.ADDNOTLS ? 拆分列表(环境.ADDNOTLS) : [];
-    let 明文接口池 = 环境.ADDNOTLSAPI ? 拆分列表(环境.ADDNOTLSAPI) : [];
-    let 测速表池 = 环境.ADDCSV ? 拆分列表(环境.ADDCSV) : [];
-    let 附加链接 = 环境.LINK ? 拆分列表(环境.LINK) : [];
+    let 节点池 = ['www.visa.com.sg:443#默认优选-SG', 'www.visa.com.hk:8443#默认优选-HK', 'icook.tw:2053#默认优选-TW'];
+    let 接口池 = [];
+    let 明文池 = [];
+    let 明文接口池 = [];
+    let 测速表池 = [];
+    let 附加链接 = [];
 
     let 外部订阅器 = 网址参数或环境变量(上下文.网址, 环境);
-
-    // 优先从 KV 空间（变量名：try）读取配置
-    const KV对象 = 环境[配置中心.KV变量名];
-    if (!外部订阅器 && KV对象) {
-        try {
-            const 存储内容 = await KV对象.get('ADD.txt');
-            if (存储内容) {
-                for (const 项 of 拆分列表(存储内容)) {
-                    if (项.startsWith('https://')) 接口池.push(项);
-                    else if (项.includes('://')) 附加链接.push(项);
-                    else 节点池.push(项);
-                }
-            }
-        } catch {}
-    }
-
-    if (节点池.length + 接口池.length + 明文池.length + 明文接口池.length + 测速表池.length === 0) {
-        节点池.push('www.visa.com.sg:443#默认优选-SG', 'www.visa.com.hk:8443#默认优选-HK', 'icook.tw:2053#默认优选-TW');
-    }
 
     const { 主机名, 伪装标识, 网址, 客户端小写 } = 上下文;
     let 伪装域名 = 上下文.伪装主机;
@@ -632,21 +604,9 @@ async function 解析测速表格(表格组, 要求加密, 上下文) {
     return 结果集;
 }
 
-async function 处理存储编辑(请求, 环境) {
-    const KV对象 = 环境[配置中心.KV变量名];
-    if (!KV对象) return new Response('未绑定名为 "try" 的 KV 命名空间', { status: 400 });
-    if (请求.method === 'POST') {
-        await KV对象.put('ADD.txt', await 请求.text());
-        return new Response('保存成功');
-    }
-    const 内容 = await KV对象.get('ADD.txt') || '';
-    const 页面 = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>节点列表管理</title><style>body{max-width:720px;margin:20px auto;font-family:sans-serif;padding:0 15px}textarea{width:100%;height:420px;font-family:monospace;padding:10px;box-sizing:border-box}button{padding:8px 20px;background:#4a90e2;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-top:10px}</style></head><body><h3>优选节点与订阅源管理 (ADD.txt)</h3><textarea id="t">${内容}</textarea><br><button onclick="fetch(location.href,{method:'POST',body:document.getElementById('t').value}).then(r=>r.text()).then(alert)">保存修改</button></body></html>`;
-    return new Response(页面, { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
-}
-
 function 渲染简易面板(上下文, 编码订阅) {
     const 基础链接 = `https://${上下文.主机名}/${上下文.主标识}`;
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${上下文.配置名称}</title><style>body{max-width:760px;margin:30px auto;font-family:sans-serif;padding:0 16px;background:#f4f7f9;color:#333}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:16px}code{display:block;background:#f0f4f8;padding:10px;border-radius:6px;word-break:break-all;margin:8px 0;cursor:pointer}</style></head><body><div class="card"><h2>🚀 ${上下文.配置名称}</h2><p>点击下方链接直接复制：</p><b>通用 / Base64 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sub</code><b>Clash 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?clash</code><b>Sing-box 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sb</code><p><a href="${上下文.网址.pathname}/edit">📝 在线编辑 KV 节点列表</a></p></div><div class="card"><h4>节点明文预览：</h4><code style="white-space:pre-wrap">${atob(编码订阅)}</code></div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${上下文.配置名称}</title><style>body{max-width:760px;margin:30px auto;font-family:sans-serif;padding:0 16px;background:#f4f7f9;color:#333}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:16px}code{display:block;background:#f0f4f8;padding:10px;border-radius:6px;word-break:break-all;margin:8px 0;cursor:pointer}</style></head><body><div class="card"><h2>🚀 ${上下文.配置名称}</h2><p>点击下方链接直接复制：</p><b>通用 / Base64 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sub</code><b>Clash 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?clash</code><b>Sing-box 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sb</code></div><div class="card"><h4>节点明文预览：</h4><code style="white-space:pre-wrap">${atob(编码订阅)}</code></div></body></html>`;
 }
 
 async function 反向代理网页(源配置, 请求网址) {
