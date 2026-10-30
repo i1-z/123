@@ -1,19 +1,19 @@
-﻿import { connect as 建立连接 } from 'cloudflare:sockets';
+import { connect as 建立连接 } from 'cloudflare:sockets';
 
-// 基础常量与编码字典（脱敏特征字面量）
-const 字典 = {
+// 核心配置与内置死代码
+const 配置中心 = {
+    固定UUID: '3dfc81a7-8cba-4a83-b590-559860dd2a44',
+    KV变量名: 'KV',
     协议名: atob('dmxlc3M='),
     转换器: atob('U3ViQXBpLkNtbGlVc3NzUy5OZXQ='),
     规则配置: atob('aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL0FDTDRTU1IvQUNMNFNTUi9tYXN0ZXIvQ2xhc2gvY29uZmlnL0FDTDRTU1JfT25saW5lX01pbmlfTXVsdGlNb2RlLmluaQ=='),
     默认后缀: atob('LnByb3h5aXAuY21saXVzc3NzLm5ldA=='),
     兜底节点: atob('UFJPWFlJUC50cDEuMDkwMjI3Lnh5eg=='),
     测速域名: atob('c3BlZWQuY2xvdWRmbGFyZS5jb20='),
-    默认标识: '3dfc81a7-8cba-4a83-b590-559860dd2a44',
     默认路径: '/?ed=2560',
     加密参数: atob('P2VuY3J5cHRpb249bm9uZSZzZWN1cml0eT10bHMmc25pPQ=='),
     明文参数: atob('P2VuY3J5cHRpb249bm9uZSZzZWN1cml0eT0mdHlwZT13cyZob3N0PQ=='),
     客户端标识: atob('djJyYXlOL2VkZ2V0dW5uZWw='),
-    明文端口组: ['8080', '8880', '2052', '2082', '2086', '2095'],
     加密端口组: ['2053', '2083', '2087', '2096', '8443']
 };
 
@@ -21,16 +21,11 @@ export default {
     async fetch(请求, 环境) {
         try {
             const 上下文 = await 初始化上下文(请求, 环境);
-            if (!上下文.主标识) {
-                return new Response('未检测到有效标识配置', { status: 404, headers: { 'Content-Type': 'text/plain;charset=utf-8' } });
-            }
-
             const 升级头 = 请求.headers.get('Upgrade');
             if (升级头 && 升级头.toLowerCase() === 'websocket') {
                 解析流参数(上下文);
                 return 处理数据流(请求, 上下文);
             }
-
             return await 处理网页请求(请求, 环境, 上下文);
         } catch (异常) {
             return new Response(异常.toString(), { status: 500 });
@@ -41,26 +36,18 @@ export default {
 async function 初始化上下文(请求, 环境) {
     const 网址 = new URL(请求.url);
     const 客户端信息 = 请求.headers.get('User-Agent') || 'null';
-    let 主标识 = 环境.UUID || 环境.uuid || 环境.PASSWORD || 环境.pswd || 字典.默认标识;
+    
+    // 直接使用写死的 UUID 作为主标识
+    let 主标识 = 配置中心.固定UUID;
     let 备用标识 = '';
-    let 动态密钥 = 主标识;
-
-    if (环境.KEY || 环境.TOKEN || (主标识 && !校验标识格式(主标识))) {
-        动态密钥 = 环境.KEY || 环境.TOKEN || 主标识;
-        const 周期天数 = Number(环境.TIME) || 30;
-        const 更新时点 = Number(环境.UPTIME) || 3;
-        const 标识组 = await 派生动态标识(动态密钥, 周期天数, 更新时点);
-        主标识 = 标识组[0];
-        备用标识 = 标识组[1];
-    }
 
     const 零点时间戳 = Math.ceil(new Date().setHours(0, 0, 0, 0) / 1000);
     const 摘要值 = await 双重摘要(`${主标识}${零点时间戳}`);
     const 伪装标识 = `${摘要值.slice(0, 8)}-${摘要值.slice(8, 12)}-${摘要值.slice(12, 16)}-${摘要值.slice(16, 20)}-${摘要值.slice(20)}`;
     const 伪装主机 = `${摘要值.slice(6, 9)}.${摘要值.slice(13, 19)}`;
 
-    const 中继列表 = 拆分列表(环境.PROXYIP || 环境.proxyip || '');
-    const 随机中继 = 中继列表.length ? 中继列表[Math.floor(Math.random() * 中继列表.length)].toLowerCase() : (请求.cf?.colo || 'HKG') + 字典.默认后缀;
+    const 中继列表 = 拆分列表(环境.PROXYIP || '');
+    const 随机中继 = 中继列表.length ? 中继列表[Math.floor(Math.random() * 中继列表.length)].toLowerCase() : (请求.cf?.colo || 'HKG') + 配置中心.默认后缀;
 
     const 代理列表 = 拆分列表(环境.HTTP || 环境.SOCKS5 || '');
     let 代理地址 = 代理列表.length ? 代理列表[Math.floor(Math.random() * 代理列表.length)] : '';
@@ -79,7 +66,7 @@ async function 初始化上下文(请求, 环境) {
         }
     }
 
-    let 隧道路径 = 字典.默认路径;
+    let 隧道路径 = 配置中心.默认路径;
     if (网址.searchParams.has('proxyip')) {
         隧道路径 = `/proxyip=${网址.searchParams.get('proxyip')}`;
         转换反代标记 = 'false';
@@ -101,7 +88,7 @@ async function 初始化上下文(请求, 环境) {
         客户端小写: 客户端信息.toLowerCase(),
         主标识,
         备用标识,
-        动态密钥,
+        动态密钥: 主标识,
         伪装标识,
         伪装主机,
         中继节点: 随机中继,
@@ -111,8 +98,8 @@ async function 初始化上下文(请求, 环境) {
         启用外部代理,
         转换反代标记,
         代理规则组: 环境.GO2SOCKS5 ? 拆分列表(环境.GO2SOCKS5) : ['*tapecontent.net', '*cloudatacdn.com', '*.loadshare.org'],
-        拦截列表: 环境.BAN ? 拆分列表(环境.BAN) : [字典.测速域名],
-        加密端口组: 环境.CFPORTS ? 拆分列表(环境.CFPORTS) : 字典.加密端口组,
+        拦截列表: 环境.BAN ? 拆分列表(环境.BAN) : [配置中心.测速域名],
+        加密端口组: 环境.CFPORTS ? 拆分列表(环境.CFPORTS) : 配置中心.加密端口组,
         隧道路径,
         强制明文: 网址.searchParams.has('notls') ? 'true' : 'false',
         跳过证书,
@@ -124,7 +111,7 @@ async function 初始化上下文(请求, 环境) {
 }
 
 async function 处理网页请求(请求, 环境, 上下文) {
-    const { 网址, 主标识, 动态密钥, 伪装标识, 主机名 } = 上下文;
+    const { 网址, 主标识, 伪装标识, 主机名 } = 上下文;
     const 路径名 = 网址.pathname;
     const 路径小写 = 路径名.toLowerCase();
 
@@ -137,7 +124,8 @@ async function 处理网页请求(请求, 环境, 上下文) {
         });
     }
 
-    if (路径名 === `/${动态密钥}/edit` || 路径小写 === `/${主标识}/edit`) {
+    // 绑定绑定的 KV 空间变量名 "try"
+    if (路径名 === `/${主标识}/edit` || 路径小写 === `/${主标识}/edit`) {
         return await 处理存储编辑(请求, 环境);
     }
 
@@ -146,7 +134,7 @@ async function 处理网页请求(请求, 环境, 上下文) {
         return new Response(伪装内容, { status: 200 });
     }
 
-    if (路径名 === `/${动态密钥}` || 路径小写 === `/${主标识}`) {
+    if (路径名 === `/${主标识}` || 路径小写 === `/${主标识}`) {
         const 订阅文本 = await 构建订阅内容(环境, 上下文, false);
         const 总额度 = 24 * 1099511627776;
         const 已用额度 = Math.floor(((Date.now() - new Date().setHours(0, 0, 0, 0)) / 86400000) * 总额度 / 2);
@@ -188,15 +176,19 @@ async function 构建订阅内容(环境, 上下文, 是否伪装请求) {
 
     let 外部订阅器 = 网址参数或环境变量(上下文.网址, 环境);
 
-    if (!外部订阅器 && 环境.KV) {
-        const 存储内容 = await 环境.KV.get('ADD.txt');
-        if (存储内容) {
-            for (const 项 of 拆分列表(存储内容)) {
-                if (项.startsWith('https://')) 接口池.push(项);
-                else if (项.includes('://')) 附加链接.push(项);
-                else 节点池.push(项);
+    // 优先从 KV 空间（变量名：try）读取配置
+    const KV对象 = 环境[配置中心.KV变量名];
+    if (!外部订阅器 && KV对象) {
+        try {
+            const 存储内容 = await KV对象.get('ADD.txt');
+            if (存储内容) {
+                for (const 项 of 拆分列表(存储内容)) {
+                    if (项.startsWith('https://')) 接口池.push(项);
+                    else if (项.includes('://')) 附加链接.push(项);
+                    else 节点池.push(项);
+                }
             }
-        }
+        } catch {}
     }
 
     if (节点池.length + 接口池.length + 明文池.length + 明文接口池.length + 测速表池.length === 0) {
@@ -216,7 +208,7 @@ async function 构建订阅内容(环境, 上下文, 是否伪装请求) {
         伪装域名 = 主机名.includes('.pages.dev') ? `${伪装域名}.pages.dev` : `${伪装域名}.xyz`;
     }
 
-    let 转换器地址 = 环境.SUBAPI || 字典.转换器;
+    let 转换器地址 = 环境.SUBAPI || 配置中心.转换器;
     let 转换协议 = 'https';
     if (转换器地址.includes('http://')) {
         转换器地址 = 转换器地址.split('//')[1];
@@ -236,7 +228,7 @@ async function 构建订阅内容(环境, 上下文, 是否伪装请求) {
         目标地址 = `https://${主机名}/${伪装标识}${网址.search}`;
     }
 
-    const 规则地址 = encodeURIComponent(环境.SUBCONFIG || 字典.规则配置);
+    const 规则地址 = encodeURIComponent(环境.SUBCONFIG || 配置中心.规则配置);
     const 跳过验证 = 上下文.跳过证书 ? 'true' : 'false';
 
     if ((客户端小写.includes('clash') && !客户端小写.includes('nekobox')) || 网址.searchParams.has('clash')) {
@@ -251,7 +243,7 @@ async function 构建订阅内容(环境, 上下文, 是否伪装请求) {
     if (!外部订阅器 && 采用编码) {
         输出内容 = 生成本地节点文本(伪装域名, 伪装标识, 节点池, 明文池, 附加链接, 上下文);
     } else {
-        const 响应 = await fetch(目标地址, { headers: { 'User-Agent': 字典.客户端标识 } });
+        const 响应 = await fetch(目标地址, { headers: { 'User-Agent': 配置中心.客户端标识 } });
         输出内容 = await 响应.text();
     }
 
@@ -274,9 +266,9 @@ function 生成本地节点文本(主机, 标识, 加密池, 明文池, 附加�
         if (是否加密) {
             const 匹配中继 = 上下文.中继池.find(项 => 项.includes(地址));
             if (匹配中继) 路径 = `/proxyip=${匹配中继}`;
-            return `${字典.协议名}://${标识}@${地址}:${端口}${字典.加密参数}${主机}&fp=random&type=ws&host=${主机}&path=${encodeURIComponent(路径)}${上下文.跳过证书参数}#${encodeURIComponent(备注)}`;
+            return `${配置中心.协议名}://${标识}@${地址}:${端口}${配置中心.加密参数}${主机}&fp=random&type=ws&host=${主机}&path=${encodeURIComponent(路径)}${上下文.跳过证书参数}#${encodeURIComponent(备注)}`;
         }
-        return `${字典.协议名}://${标识}@${地址}:${端口}${字典.明文参数}${主机}&path=${encodeURIComponent(路径)}#${encodeURIComponent(备注)}`;
+        return `${配置中心.协议名}://${标识}@${地址}:${端口}${配置中心.明文参数}${主机}&path=${encodeURIComponent(路径)}#${encodeURIComponent(备注)}`;
     };
 
     const 结果集 = 加密池.map(项 => 格式化单条(项, true));
@@ -362,7 +354,7 @@ async function 处理数据流(请求, 上下文) {
 
             if (数据包.byteLength < 24) return;
             const 头部字节 = new Uint8Array(数据包.slice(1, 17));
-            if (!核对标识字节(头部字节, 上下文.主标识) && !(上下文.备用标识 && 核对标识字节(头部字节, 上下文.备用标识))) return;
+            if (!核对标识字节(头部字节, 上下文.主标识)) return;
 
             const 视图 = new DataView(数据包);
             const 协议版本 = 视图.getUint8(0);
@@ -447,7 +439,7 @@ async function 处理数据流(请求, 上下文) {
                             套接字 = 建立连接({ hostname: 中继主机, port: 中继端口 });
                             await 套接字.opened;
                         } catch {
-                            套接字 = 建立连接({ hostname: 字典.兜底节点, port: 1 });
+                            套接字 = 建立连接({ hostname: 配置中心.兜底节点, port: 1 });
                             await 套接字.opened;
                         }
                     }
@@ -477,7 +469,6 @@ async function 处理数据流(请求, 上下文) {
     return new Response(null, { status: 101, webSocket: 客户端 });
 }
 
-// 代理连接与辅助工具函数
 async function 建立套接字代理连接(目标主机, 目标端口, 代理配置串) {
     const { 账号, 密码, 主机, 端口 } = 解析代理配置(代理配置串);
     const 套接字 = 建立连接({ hostname: 主机, port: 端口 });
@@ -642,18 +633,19 @@ async function 解析测速表格(表格组, 要求加密, 上下文) {
 }
 
 async function 处理存储编辑(请求, 环境) {
-    if (!环境.KV) return new Response('未绑定 KV 存储空间', { status: 400 });
+    const KV对象 = 环境[配置中心.KV变量名];
+    if (!KV对象) return new Response('未绑定名为 "try" 的 KV 命名空间', { status: 400 });
     if (请求.method === 'POST') {
-        await 环境.KV.put('ADD.txt', await 请求.text());
+        await KV对象.put('ADD.txt', await 请求.text());
         return new Response('保存成功');
     }
-    const 内容 = await 环境.KV.get('ADD.txt') || '';
+    const 内容 = await KV对象.get('ADD.txt') || '';
     const 页面 = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>节点列表管理</title><style>body{max-width:720px;margin:20px auto;font-family:sans-serif;padding:0 15px}textarea{width:100%;height:420px;font-family:monospace;padding:10px;box-sizing:border-box}button{padding:8px 20px;background:#4a90e2;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-top:10px}</style></head><body><h3>优选节点与订阅源管理 (ADD.txt)</h3><textarea id="t">${内容}</textarea><br><button onclick="fetch(location.href,{method:'POST',body:document.getElementById('t').value}).then(r=>r.text()).then(alert)">保存修改</button></body></html>`;
     return new Response(页面, { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
 }
 
 function 渲染简易面板(上下文, 编码订阅) {
-    const 基础链接 = `https://${上下文.主机名}/${上下文.动态密钥}`;
+    const 基础链接 = `https://${上下文.主机名}/${上下文.主标识}`;
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${上下文.配置名称}</title><style>body{max-width:760px;margin:30px auto;font-family:sans-serif;padding:0 16px;background:#f4f7f9;color:#333}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.06);margin-bottom:16px}code{display:block;background:#f0f4f8;padding:10px;border-radius:6px;word-break:break-all;margin:8px 0;cursor:pointer}</style></head><body><div class="card"><h2>🚀 ${上下文.配置名称}</h2><p>点击下方链接直接复制：</p><b>通用 / Base64 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sub</code><b>Clash 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?clash</code><b>Sing-box 订阅：</b><code onclick="navigator.clipboard.writeText(this.innerText).then(()=>alert('已复制'))">${基础链接}?sb</code><p><a href="${上下文.网址.pathname}/edit">📝 在线编辑 KV 节点列表</a></p></div><div class="card"><h4>节点明文预览：</h4><code style="white-space:pre-wrap">${atob(编码订阅)}</code></div></body></html>`;
 }
 
@@ -668,10 +660,6 @@ async function 反向代理网页(源配置, 请求网址) {
 function 拆分列表(文本) {
     if (!文本) return [];
     return 文本.replace(/[\t"'\r\n]+/g, ',').replace(/,+/g, ',').replace(/^,|,$/g, '').split(',').filter(Boolean);
-}
-
-function 校验标识格式(字符串) {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(字符串);
 }
 
 function 核对标识字节(字节数组, 标识字符串) {
@@ -699,15 +687,4 @@ async function 双重摘要(文本) {
     const 首轮 = Array.from(new Uint8Array(await crypto.subtle.digest('MD5', 编码器.encode(文本)))).map(b => b.toString(16).padStart(2, '0')).join('');
     const 次轮 = Array.from(new Uint8Array(await crypto.subtle.digest('MD5', 编码器.encode(首轮.slice(7, 27))))).map(b => b.toString(16).padStart(2, '0')).join('');
     return 次轮.toLowerCase();
-}
-
-async function 派生动态标识(密钥, 周期天数, 更新时点) {
-    const 基准时间 = new Date(2007, 6, 7, 更新时点, 0, 0).getTime();
-    const 周期毫秒 = 86400000 * 周期天数;
-    const 当前周期 = Math.ceil((Date.now() + 28800000 - 基准时间) / 周期毫秒);
-    const 生成 = async (种子) => {
-        const 哈希 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(种子)))).map(b => b.toString(16).padStart(2, '0')).join('');
-        return `${哈希.slice(0, 8)}-${哈希.slice(8, 12)}-4${哈希.slice(13, 16)}-${(parseInt(哈希.slice(16, 18), 16) & 0x3f | 0x80).toString(16)}${哈希.slice(18, 20)}-${哈希.slice(20, 32)}`;
-    };
-    return Promise.all([生成(密钥 + 当前周期), 生成(密钥 + (当前周期 - 1))]);
 }
